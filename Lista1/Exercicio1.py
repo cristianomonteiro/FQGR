@@ -4,12 +4,12 @@ preco1Acao = 100
 precoOpcao = 1.6
 pExercicio = 102
 
-#Cenário R$105
+#Exemplo para R$105
 preco2Acao = 105
 patrimonio105 = preco1Acao - preco2Acao - precoOpcao + (preco2Acao - pExercicio)
 print(patrimonio105)
 
-#Cenário R$95
+#Exemplo para R$95
 preco2Acao = 95
 patrimonio95 = preco1Acao - preco2Acao - precoOpcao
 print(patrimonio95)

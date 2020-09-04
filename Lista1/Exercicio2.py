@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 #Calculando a esperança
 #15/30 = 1/2 chances de perder o valor total
@@ -9,23 +10,45 @@ import numpy as np
 #E(X) = 0,933333333
 
 #Calculando a média temporal
-def proporcaoM(w):
+def mediaAritmetica(w):
+    return (1 - w)*(15/30) + (1 - w/2)*(14/30) + (1 + 50*w)*(1/30) - 1
+
+def mediaAritmeticaSimplificada(w):
+    return (1 - w)*(1/2) + (1 - w/2)*(7/15) + (1 + 50*w)*(1/30) - 1
+
+def mediaGeometrica(w):
     return ((1 - w)**(15/30)) * ((1 - w/2)**(14/30)) * ((1 + 50*w)**(1/30)) - 1
 
-def proporcaoMSimplificado(w):
+def mediaGeometricaSimplificada(w):
     return ((1 - w)**(1/2)) * ((1 - w/2)**(7/15)) * ((1 + 50*w)**(1/30)) - 1
 
 print("RESULTADOS")
 
-print('1% ' + str(proporcaoM(0.01)))
-print('1% ' + str(proporcaoMSimplificado(0.01)) + '\n')
-print('2% ' + str(proporcaoM(0.02)))
-print('2% ' + str(proporcaoMSimplificado(0.02)) + '\n')
-print('2.5% ' + str(proporcaoM(0.025)))
-print('2.5% ' + str(proporcaoMSimplificado(0.025)) + '\n')
-print('3% ' + str(proporcaoM(0.03)))
-print('3% ' + str(proporcaoMSimplificado(0.03)) + '\n')
-print('4% ' + str(proporcaoM(0.04)))
-print('4% ' + str(proporcaoMSimplificado(0.04)) + '\n')
-print('5% ' + str(proporcaoM(0.05)))
-print('5% ' + str(proporcaoMSimplificado(0.05)) + '\n')
+wValues = [w for w in np.arange(0, 1, 0.001)]
+esperanca = [mediaAritmetica(w) for w in wValues]
+mediaTemporal = [mediaGeometrica(w) for w in wValues]
+
+print("Maior esperança: " + str(mediaAritmetica(1)) + " com 100%% do patrimônio.")
+
+maiorMediaTemporal = np.where(mediaTemporal == np.amax(mediaTemporal))[0][0]
+print("Maior média memporal: " + str(mediaTemporal[maiorMediaTemporal]*100) + " com " + str(wValues[maiorMediaTemporal]*100) + "% do patrimônio.")
+
+wValues100 = [100*w for w in wValues]
+esperanca100 = [100*x for x in esperanca]
+mediaTemporal100 = [100*x for x in mediaTemporal]
+
+font = {'family' : 'normal',
+        'weight' : 'bold',
+        'size'   : 16}
+
+plt.rc('font', **font)
+
+plt.plot(wValues100, esperanca100)
+plt.plot(wValues100, mediaTemporal100)
+plt.axhline(color='r')
+plt.xlabel("Posição")
+plt.ylabel("Retorno")
+plt.xlim(0, 100)
+plt.ylim(-100, 100)
+plt.tight_layout()
+plt.show()
