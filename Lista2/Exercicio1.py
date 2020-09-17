@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
+from statsmodels.tsa.stattools import adfuller
+from sklearn.linear_model import LinearRegression
 #from pandas.plotting import register_matplotlib_converters
 #register_matplotlib_converters()
 
@@ -9,17 +11,38 @@ from os.path import dirname, abspath
 parentDirectory = dirname(dirname(abspath(__file__)))
 
 prices = pd.read_csv(parentDirectory + '/Dados/IBOV.csv', parse_dates=['Date'], index_col='Date')
-#print(prices[prices.columns[:10]].tail())
 
-#Correlações de 2019
 pricesInterval = prices['2018':'2019'].dropna()
-pricesInterval['PETR3']
 
-for asset in pricesInterval:
-    if asset != 'PETR3':
-        pricesInterval[asset].pct_change()
+#CHECKING IF PETR3 IS STATIONARY
+pricesPETR3 = pricesInterval['PETR3']
+posPValue = 1
+print(f"P-value for PETR3 not being stationary: {adfuller(pricesPETR3)[posPValue]:.3f}")
+diffPricesPETR3 = np.diff(pricesInterval['PETR3'])
+print(f"P-value for PETR3 I(1) not being stationary: {adfuller(diffPricesPETR3)[posPValue]:.3f}")
 
-corrPrecos2019 = []
+#SELECTING PAIRS
+pValueThreshold = 0.05
+selectedPairs = []
+for asset in pricesInterval.drop(columns=['PETR3']):
+        pricesAsset = pricesInterval[asset]
+        diffPricesAsset = np.diff(pricesAsset)
+        pValueAsset = adfuller(diffPricesAsset)[posPValue]
+        if pValueAsset < pValueThreshold:
+                selectedPairs.append(asset)
+                print('Asset: ' + asset + f' p-value: {pValueAsset:.3f}')
+
+#LINEAR REGRESSION
+                linReg = LinearRegression().fit([pricesPETR3], pricesAsset)
+                posAlpha = 0
+                residues = linReg.intercept_ + linReg.coef_[posAlpha]*pricesPETR3 - pricesAsset
+                pValueResidues = adfuller(residues)[posPValue]
+                if pValueResidues < pValueThreshold:
+                        print(f'P-value: {pValueAsset:.3f} Alpha: {reg.coef_[posAlpha]:.3f} Beta: {reg.intercept_:.3f}')
+                        if len(selectedPairs) >= 3:
+                                break
+
+corrPrecos2019 = pd.df([])
 corrRetornos2019 = prices['2019':'2020-01-02'].dropna().pct_change().corr()['IBOV'].drop('IBOV')
 
 print("Média das correlações dos preços: " + str(corrPrecos2019.mean()))
