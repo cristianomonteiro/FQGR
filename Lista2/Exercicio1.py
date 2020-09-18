@@ -29,7 +29,7 @@ def plotResiduesGraph(residues, title):
 #                'size'   : 16}
 
 #        plt.rc('font', **font)
-        ax = residues.plot(title=title, xlabel="Datas", ylabel="Resíduos")
+        ax = residues.plot(title=title)
         ax.axhline(residues.mean(), color='r')
 
 #set monthly locator
@@ -43,8 +43,11 @@ def plotResiduesGraph(residues, title):
         xTickValue = ax.get_xticks()[-2] + 60
         ax.set_xticks(np.append(ax.get_xticks(), xTickValue))
 
+        ax.set_xlabel("Datas")
+        ax.set_ylabel("Resíduos")
+
 #set formatter
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%Y'))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%Y'))
 
         plt.tight_layout()
         plt.show()
