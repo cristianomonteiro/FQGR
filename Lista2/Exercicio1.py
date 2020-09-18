@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime
 from scipy.stats import norm
 from statsmodels.tsa.stattools import adfuller
 from sklearn.linear_model import LinearRegression
@@ -10,73 +12,70 @@ from sklearn.linear_model import LinearRegression
 from os.path import dirname, abspath
 parentDirectory = dirname(dirname(abspath(__file__)))
 
+def checkPrintStationarity(pricesInterval, asset):
+        prices = pricesInterval[asset]
+        posPValue = 1
+        pValuePrices = adfuller(prices)[posPValue]
+        print('P-value for ' + asset + f" not being stationary: {pValuePrices:.3f}")
+        diffPrices = np.diff(pricesInterval[asset])
+        pValueI1Prices = adfuller(diffPrices)[posPValue]
+        print('P-value for ' + asset + f" I(1) not being stationary: {pValueI1Prices:.3f}")
+
+        return prices, diffPrices, pValuePrices, pValueI1Prices
+
+def plotResiduesGraph(residues, title):
+#        font = {'family' : 'normal',
+#                'weight' : 'bold',
+#                'size'   : 16}
+
+#        plt.rc('font', **font)
+        ax = residues.plot(title=title, xlabel="Datas", ylabel="Resíduos")
+        ax.axhline(residues.mean(), color='r')
+
+#set monthly locator
+        stepBetweenMonths = 2
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=stepBetweenMonths))
+
+        #Forcing inclusion of first month tick
+        xTickValue = ax.get_xticks()[0] - 59
+        ax.set_xticks(np.append(ax.get_xticks(), xTickValue))
+        #Forcing inclusion of last month tick
+        xTickValue = ax.get_xticks()[-2] + 60
+        ax.set_xticks(np.append(ax.get_xticks(), xTickValue))
+
+#set formatter
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%Y'))
+
+        plt.tight_layout()
+        plt.show()
+
 prices = pd.read_csv(parentDirectory + '/Dados/IBOV.csv', parse_dates=['Date'], index_col='Date')
 
 pricesInterval = prices['2018':'2019'].dropna()
 
 #CHECKING IF PETR3 IS STATIONARY
-pricesPETR3 = pricesInterval['PETR3']
-posPValue = 1
-print(f"P-value for PETR3 not being stationary: {adfuller(pricesPETR3)[posPValue]:.3f}")
-diffPricesPETR3 = np.diff(pricesInterval['PETR3'])
-print(f"P-value for PETR3 I(1) not being stationary: {adfuller(diffPricesPETR3)[posPValue]:.3f}")
+pricesPETR3, diffPricesPETR3, pValuePETR3, pValueI1Prices = checkPrintStationarity(pricesInterval, 'PETR3')
 
 #SELECTING PAIRS
 pValueThreshold = 0.05
 selectedPairs = []
 for asset in pricesInterval.drop(columns=['PETR3']):
-        pricesAsset = pricesInterval[asset]
-        diffPricesAsset = np.diff(pricesAsset)
-        pValueAsset = adfuller(diffPricesAsset)[posPValue]
-        if pValueAsset < pValueThreshold:
-                selectedPairs.append(asset)
-                print('Asset: ' + asset + f' p-value: {pValueAsset:.3f}')
+        pricesAsset, diffPricesAsset, pValuePrices, pValueI1Asset = checkPrintStationarity(pricesInterval, asset)
 
+        if pValueI1Asset < pValueThreshold:
 #LINEAR REGRESSION
-                linReg = LinearRegression().fit([pricesPETR3], pricesAsset)
+                pricesPETR3Reshaped = pricesPETR3.values.reshape(-1,1)
+                linReg = LinearRegression().fit(pricesPETR3Reshaped, pricesAsset)
                 posAlpha = 0
                 residues = linReg.intercept_ + linReg.coef_[posAlpha]*pricesPETR3 - pricesAsset
+                posPValue = 1
                 pValueResidues = adfuller(residues)[posPValue]
+                print(f'P-value for residues: {pValueResidues:.3f} Alpha: {linReg.coef_[posAlpha]:.3f} Beta: {linReg.intercept_:.3f}')
+                
                 if pValueResidues < pValueThreshold:
-                        print(f'P-value: {pValueAsset:.3f} Alpha: {reg.coef_[posAlpha]:.3f} Beta: {reg.intercept_:.3f}')
+                        print('Asset ' + asset + ' selected as cointegrated with PETR3.')
+                        selectedPairs.append(asset)
+                        plotResiduesGraph(residues, 'PETR3 x ' + asset)
+                        print('==============================================================')
                         if len(selectedPairs) >= 3:
                                 break
-
-corrPrecos2019 = pd.df([])
-corrRetornos2019 = prices['2019':'2020-01-02'].dropna().pct_change().corr()['IBOV'].drop('IBOV')
-
-print("Média das correlações dos preços: " + str(corrPrecos2019.mean()))
-print("Média das correlações dos retornos: " + str(corrRetornos2019.mean()) + "\n")
-print("Menor correlação dos preços: " + str(corrPrecos2019.min()) + " aconteceu com a ação: " + corrPrecos2019.idxmin())
-print("Menor correlação dos retornos: " + str(corrRetornos2019.min()) + " aconteceu com a ação: " + corrPrecos2019.idxmin() + "\n")
-print("Maior correlação dos preços: " + str(corrPrecos2019.max()) + " aconteceu com a ação: " + corrPrecos2019.idxmax())
-print("Maior correlação dos retornos: " + str(corrRetornos2019.max()) + " aconteceu com a ação: " + corrPrecos2019.idxmax())
-
-#Correlações de 2020
-corrPrecos2020 = prices['2020'].corr()['IBOV'].drop('IBOV')
-corrRetornos2020 = prices['2020'].pct_change().corr()['IBOV'].drop('IBOV')
-
-print("Média das correlações dos preços: " + str(corrPrecos2020.mean()))
-print("Média das correlações dos retornos: " + str(corrRetornos2020.mean()) + "\n")
-print("Menor correlação dos preços: " + str(corrPrecos2020.min()) + " aconteceu com a ação: " + corrPrecos2019.idxmin())
-print("Menor correlação dos retornos: " + str(corrRetornos2020.min()) + " aconteceu com a ação: " + corrPrecos2019.idxmin() + "\n")
-print("Maior correlação dos preços: " + str(corrPrecos2020.max()) + " aconteceu com a ação: " + corrPrecos2019.idxmax())
-print("Maior correlação dos retornos: " + str(corrRetornos2020.max()) + " aconteceu com a ação: " + corrPrecos2019.idxmax())
-
-font = {'family' : 'normal',
-        'weight' : 'bold',
-        'size'   : 16}
-
-plt.rc('font', **font)
-
-corrPrecos2019.plot.hist(bins=50, xlim=(-1,1), ylim=(0,12))
-plt.ylabel("Frequência")
-plt.xlabel("Correlação")
-plt.tight_layout()
-plt.show()
-
-corrPrecos2020.plot.hist(bins=50, xlim=(-1,1), ylim=(0,12))
-plt.axes().axes.get_yaxis().get_label().set_visible(False)
-plt.xlabel("Correlação")
-plt.tight_layout()
-plt.show()
