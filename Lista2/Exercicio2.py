@@ -1,54 +1,66 @@
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pyomo.environ as pyo
+from pyomo.opt import SolverFactory
+import math
 
-#Calculando a esperança
-#15/30 = 1/2 chances de perder o valor total
-#14/30 = 7/15 chances de perder metade do valor
-#1/30 chances de aumentar o total 50 vezes
-#E(X) = (1/2) * (1 - 1) + (7/15) * (1 - 0,5) + (1/30) * (1 + 50) - 1
-#E(X) = (1/2) * 0 + (7/15) * 0,5 + (1/30) * 51 - 1
-#E(X) = 0,933333333
+from os.path import dirname, abspath
+parentDirectory = dirname(dirname(abspath(__file__)))
 
-#Calculando a média temporal
-def mediaAritmetica(w):
-    return (1 - w)*(15/30) + (1 - w/2)*(14/30) + (1 + 50*w)*(1/30) - 1
+def pricesReturnsMean(prices, year):
+    pricesYear = prices[year].dropna()
+    returns = pricesYear.pct_change()
+    meanReturns = returns.mean()
+    sumE = returns.cov()
 
-def mediaAritmeticaSimplificada(w):
-    return (1 - w)*(1/2) + (1 - w/2)*(7/15) + (1 + 50*w)*(1/30) - 1
+    return prices, returns, meanReturns, sumE
 
-def mediaGeometrica(w):
-    return ((1 - w)**(15/30)) * ((1 - w/2)**(14/30)) * ((1 + 50*w)**(1/30)) - 1
+def varPortfolio(model, sumE):
+    w = np.reshape([model.w[asset].value for asset in sumE], (-1,1))
+    var = np.matmul(w.transpose(), np.matmul(sumE.to_numpy(), w))
 
-def mediaGeometricaSimplificada(w):
-    return ((1 - w)**(1/2)) * ((1 - w/2)**(7/15)) * ((1 + 50*w)**(1/30)) - 1
+    return var[0]
 
-print("RESULTADOS")
+def createDefaultModel(sumE):
+    model = pyo.ConcreteModel()
+    model.w = pyo.Var(sumE.columns, domain=pyo.Reals)
 
-wValues = [w for w in np.arange(0, 1, 0.001)]
-esperanca = [mediaAritmetica(w) for w in wValues]
-mediaTemporal = [mediaGeometrica(w) for w in wValues]
+    model.objective = pyo.Objective(expr = 1/2*sum(sumE[i][j] * model.w[i] * model.w[j] for i in sumE for j in sumE))
+    model.CstrSumW1 = pyo.Constraint(expr = sum(model.w[asset] for asset in sumE) == 1)
 
-print("Maior esperança: " + str(mediaAritmetica(1)) + " com 100%% do patrimônio.")
+    return model
 
-maiorMediaTemporal = np.where(mediaTemporal == np.amax(mediaTemporal))[0][0]
-print("Maior média memporal: " + str(mediaTemporal[maiorMediaTemporal]*100) + " com " + str(wValues[maiorMediaTemporal]*100) + "% do patrimônio.")
+def resultsSimulation(letter, model, meanRet, sumE):
+    threshold = 0.0001
+    wSelected = pd.DataFrame([[asset, model.w[asset].value] for asset in sumE if abs(model.w[asset].value) >= threshold],
+                            columns=['Asset', 'w'])#.set_index('Asset')
+    wSelected.plot.bar(x='Asset', y='w')
+    plt.ylabel("Peso")
+    plt.xlabel("Ativo")
+    plt.tight_layout()    
+    plt.show()
 
-wValues100 = [100*w for w in wValues]
-esperanca100 = [100*x for x in esperanca]
-mediaTemporal100 = [100*x for x in mediaTemporal]
+    meanPortfolio = sum([model.w[asset].value * meanRet[asset] for asset in meanRet.index.values])
+    stdPortfolio = math.sqrt(varPortfolio(model, sumE))
+    print("##############################################################")
+    print('Letra ' + letter + f')\n\tMédia do portfólio: {meanPortfolio:.5f}\n\tDesvio padrão: {stdPortfolio:.5f}')
 
-font = {'family' : 'normal',
-        'weight' : 'bold',
-        'size'   : 16}
+    return meanPortfolio, stdPortfolio
 
-plt.rc('font', **font)
+def letterA(meanRet, sumE):
+    model = createDefaultModel(sumE)
+    results = pyo.SolverFactory('ipopt').solve(model)
+    model.solutions.store_to(results)
+    #print(results)
 
-plt.plot(wValues100, esperanca100)
-plt.plot(wValues100, mediaTemporal100)
-plt.axhline(color='r')
-plt.xlabel("Posição")
-plt.ylabel("Retorno")
-plt.xlim(0, 100)
-plt.ylim(-100, 100)
-plt.tight_layout()
-plt.show()
+    meanPortfolio, stdPortfolio = resultsSimulation('a', model, meanRet, sumE)
+
+    return meanPortfolio, stdPortfolio
+
+prices = pd.read_csv(parentDirectory + '/Dados/IBOV.csv', parse_dates=['Date'], index_col='Date')
+
+pricesInSample, returnsInSample, meanRetInSample, sumEInSample = pricesReturnsMean(prices, '2019')
+pricesOutOfSample, returnsOutOfSample, meanRetOutOfSample, sumEOutOfSample = pricesReturnsMean(prices, '2020')
+
+letterA(meanRetInSample, sumEInSample)
