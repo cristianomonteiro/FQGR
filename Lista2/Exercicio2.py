@@ -10,7 +10,7 @@ from os.path import dirname, abspath
 parentDirectory = dirname(dirname(abspath(__file__)))
 
 def pricesReturnsMean(prices, year):
-    pricesYear = prices[year].dropna()
+    pricesYear = prices[year].drop(columns=['IBOV']).dropna()
     returns = pricesYear.pct_change().dropna()
     meanReturns = returns.mean()
     sumE = returns.cov()
@@ -48,7 +48,7 @@ def resultsSimulation(letter, model, meanRet, sumE, shouldPrintPlot=True):
         threshold = 0.0001
         wSelected = pd.DataFrame([[asset, model.w[asset].value] for asset in sumE if abs(model.w[asset].value) >= threshold],
                                 columns=['Asset', 'w'])#.set_index('Asset')
-        wSelected.plot.bar(x='Asset', y='w')
+        wSelected.sort_values(['w']).plot.bar(x='Asset', y='w')
         plt.ylabel("Peso")
         plt.xlabel("Ativo")
         plt.tight_layout()    

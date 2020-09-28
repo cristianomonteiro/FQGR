@@ -16,10 +16,10 @@ def checkPrintStationarity(pricesInterval, asset):
         prices = pricesInterval[asset]
         posPValue = 1
         pValuePrices = adfuller(prices)[posPValue]
-        print('P-value for ' + asset + f" not being stationary: {pValuePrices:.3f}")
+        print('P-value for ' + asset + f" not being stationary: {pValuePrices:.5f}")
         diffPrices = np.diff(pricesInterval[asset])
         pValueI1Prices = adfuller(diffPrices)[posPValue]
-        print('P-value for ' + asset + f" I(1) not being stationary: {pValueI1Prices:.3f}")
+        print('P-value for ' + asset + f" I(1) not being stationary: {pValueI1Prices:.5f}")
 
         return prices, diffPrices, pValuePrices, pValueI1Prices
 
@@ -69,11 +69,11 @@ for asset in pricesInterval.drop(columns=['PETR3']):
 #LINEAR REGRESSION
                 pricesPETR3Reshaped = pricesPETR3.values.reshape(-1,1)
                 linReg = LinearRegression().fit(pricesPETR3Reshaped, pricesAsset)
-                posAlpha = 0
-                residues = linReg.intercept_ + linReg.coef_[posAlpha]*pricesPETR3 - pricesAsset
+                posBeta = 0
+                residues = linReg.intercept_ + linReg.coef_[posBeta]*pricesPETR3 - pricesAsset
                 posPValue = 1
                 pValueResidues = adfuller(residues)[posPValue]
-                print(f'P-value for residues: {pValueResidues:.3f} Alpha: {linReg.coef_[posAlpha]:.3f} Beta: {linReg.intercept_:.3f}')
+                print(f'P-value for residues: {pValueResidues:.5f} Alpha: {linReg.intercept_:.5f} Beta: {linReg.coef_[posBeta]:.5f}')
                 
                 if pValueResidues < pValueThreshold:
                         print('Asset ' + asset + ' selected as cointegrated with PETR3.')
