@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime
 from scipy.stats import norm
+from statsmodels.tsa.stattools import coint
 from statsmodels.tsa.stattools import adfuller
 from sklearn.linear_model import LinearRegression
 #from pandas.plotting import register_matplotlib_converters
@@ -17,20 +18,21 @@ def checkPrintStationarity(pricesInterval, asset):
         posPValue = 1
         pValuePrices = adfuller(prices)[posPValue]
         print('P-value for ' + asset + f" not being stationary: {pValuePrices:.5f}")
-        diffPrices = np.diff(pricesInterval[asset])
+        diffPrices = np.diff(prices)
         pValueI1Prices = adfuller(diffPrices)[posPValue]
         print('P-value for ' + asset + f" I(1) not being stationary: {pValueI1Prices:.5f}")
 
         return prices, diffPrices, pValuePrices, pValueI1Prices
 
-def plotResiduesGraph(residues, title):
+def plotResiduesGraph(residues, asset):
 #        font = {'family' : 'normal',
 #                'weight' : 'bold',
 #                'size'   : 16}
 
 #        plt.rc('font', **font)
-        ax = residues.plot(title=title)
-        ax.axhline(residues.mean(), color='r')
+        ax = residues.plot(title='Resíduos PETR3 x ' + asset, label='Resíduos')
+        ax.axhline(residues.mean(), color='r', label='Média')
+        plt.legend()
 
 #set monthly locator
         stepBetweenMonths = 2
@@ -49,6 +51,7 @@ def plotResiduesGraph(residues, title):
 #set formatter
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%Y'))
 
+        plt.grid(axis='y')
         plt.tight_layout()
         plt.show()
 
@@ -62,7 +65,7 @@ pricesPETR3, diffPricesPETR3, pValuePETR3, pValueI1Prices = checkPrintStationari
 #SELECTING PAIRS
 pValueThreshold = 0.05
 selectedPairs = []
-for asset in pricesInterval.drop(columns=['PETR3']):
+for asset in pricesInterval:
         pricesAsset, diffPricesAsset, pValuePrices, pValueI1Asset = checkPrintStationarity(pricesInterval, asset)
 
         if pValueI1Asset < pValueThreshold:
@@ -70,15 +73,16 @@ for asset in pricesInterval.drop(columns=['PETR3']):
                 pricesPETR3Reshaped = pricesPETR3.values.reshape(-1,1)
                 linReg = LinearRegression().fit(pricesPETR3Reshaped, pricesAsset)
                 posBeta = 0
-                residues = linReg.intercept_ + linReg.coef_[posBeta]*pricesPETR3 - pricesAsset
+                residues = -linReg.intercept_ - linReg.coef_[posBeta]*pricesPETR3 + pricesAsset
                 posPValue = 1
                 pValueResidues = adfuller(residues)[posPValue]
-                print(f'P-value for residues: {pValueResidues:.5f} Alpha: {linReg.intercept_:.5f} Beta: {linReg.coef_[posBeta]:.5f}')
+                pValueCoint = coint(pricesPETR3, pricesAsset)[posPValue]
+                print(f'P-value from coint: {pValueCoint:.5f} P-value for residues: {pValueResidues:.5f} Alpha: {linReg.intercept_:.5f} Beta: {linReg.coef_[posBeta]:.5f}')
                 
-                if pValueResidues < pValueThreshold:
+                if pValueResidues < pValueThreshold and pValueCoint < pValueThreshold:
                         print('Asset ' + asset + ' selected as cointegrated with PETR3.')
                         selectedPairs.append(asset)
-                        plotResiduesGraph(residues, 'PETR3 x ' + asset)
+                        plotResiduesGraph(residues, asset)
                         print('==============================================================')
-                        if len(selectedPairs) >= 3:
+                        if len(selectedPairs) >= 300:
                                 break

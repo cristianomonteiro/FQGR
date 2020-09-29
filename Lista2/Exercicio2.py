@@ -15,7 +15,9 @@ def pricesReturnsMean(prices, year):
     meanReturns = returns.mean()
     sumE = returns.cov()
 
-    return pricesYear, returns, meanReturns, sumE
+    pricesIBOV = prices[year]['IBOV'].dropna()
+
+    return pricesYear, returns, meanReturns, sumE, pricesIBOV
 
 def varPortfolio(model, sumE):
     w = np.reshape([model.w[asset].value for asset in sumE], (-1,1))
@@ -48,10 +50,12 @@ def resultsSimulation(letter, model, meanRet, sumE, shouldPrintPlot=True):
         threshold = 0.0001
         wSelected = pd.DataFrame([[asset, model.w[asset].value] for asset in sumE if abs(model.w[asset].value) >= threshold],
                                 columns=['Asset', 'w'])#.set_index('Asset')
-        wSelected.sort_values(['w']).plot.bar(x='Asset', y='w')
+        ax = wSelected.sort_values(['w']).plot.bar(x='Asset', y='w')
+        ax.legend(loc=2)
         plt.ylabel("Peso")
         plt.xlabel("Ativo")
-        plt.tight_layout()    
+        plt.grid(axis='y')
+        plt.tight_layout()
         plt.show()
 
     return meanPortfolio, stdPortfolio
@@ -91,27 +95,24 @@ def letterC(meanRet, sumE, shouldPrintPlot=True):
 
     return meanPortfolio, stdPortfolio, model
 
-def letterD(prices, returns, meanRet, sumE):
+def calcPricesSeries(model, budget, prices):
+    series = (model.w['BOVA11'].value * budget/prices['BOVA11'][0]) * prices['BOVA11']
+
+    for asset in prices.drop(columns=['BOVA11']):
+        series += (model.w[asset].value * budget/prices[asset][0]) * prices[asset]
+    
+    return series
+
+def letterD(prices, pricesIBOV, meanRet, sumE):
     meanA, stdA, modelA = letterA(meanRet, sumE, shouldPrintPlot=False)
     meanB, stdB, modelB = letterB(meanRet, sumE, shouldPrintPlot=False)
     meanC, stdC, modelC = letterC(meanRet, sumE, shouldPrintPlot=False)
 
-    seriesIBOV = prices['IBOV']/prices['IBOV'][0]
-    seriesA = modelA.w['IBOV'].value * (1 + returns['IBOV'])
-    seriesB = modelB.w['IBOV'].value * (1 + returns['IBOV'])
-    seriesC = modelC.w['IBOV'].value * (1 + returns['IBOV'])
-    for asset in returns.drop(columns=['IBOV']):
-        seriesA += modelA.w[asset].value * (1 + returns[asset])
-        seriesB += modelB.w[asset].value * (1 + returns[asset])
-        seriesC += modelC.w[asset].value * (1 + returns[asset])
-    seriesA = np.cumprod(seriesA)
-    seriesB = np.cumprod(seriesB)
-    seriesC = np.cumprod(seriesC)
-
-    print(seriesIBOV)
-    print(seriesA)
-    print(seriesB)
-    print(seriesC)
+    seriesIBOV = pricesIBOV/pricesIBOV[0]
+    budget = 1.0
+    seriesA = calcPricesSeries(modelA, budget, prices)
+    seriesB = calcPricesSeries(modelB, budget, prices)
+    seriesC = calcPricesSeries(modelC, budget, prices)
 
     ax = seriesIBOV.plot(label='IBOV', legend=True)
     seriesA.plot(ax=ax, label='P1', legend=True)
@@ -133,27 +134,27 @@ def letterD(prices, returns, meanRet, sumE):
 
 #set formatter
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%Y'))
+    plt.grid()
     plt.tight_layout()
     plt.show()
 
-def letterE(meanRet, sumE):
-    meanA, stdA, modelA = letterA(meanRet, sumE, shouldPrintPlot=False)
-    meanB, stdB, modelB = letterB(meanRet, sumE, shouldPrintPlot=False)
-    meanC, stdC, modelC = letterC(meanRet, sumE, shouldPrintPlot=False)
+    return seriesIBOV, seriesA, seriesB, seriesC
 
+def letterE(seriesIBOV, seriesA, seriesB, seriesC):
     print('##########################################################')
     print('Letra e) Out of Sample:')
-    print(f'a)\tMédia do portfólio: {meanA:.5f}\n\tDesvio padrão: {stdA:.5f}')
-    print(f'b)\tMédia do portfólio: {meanB:.5f}\n\tDesvio padrão: {stdB:.5f}')
-    print(f'c)\tMédia do portfólio: {meanC:.5f}\n\tDesvio padrão: {stdC:.5f}')
+    print(f'a)\tMédia dos retornos: {seriesA.pct_change().dropna().mean():.5f}\n\tDesvio padrão: {seriesA.pct_change().dropna().std():.5f}')
+    print(f'b)\tMédia dos retornos: {seriesB.pct_change().dropna().mean():.5f}\n\tDesvio padrão: {seriesB.pct_change().dropna().std():.5f}')
+    print(f'c)\tMédia dos retornos: {seriesC.pct_change().dropna().mean():.5f}\n\tDesvio padrão: {seriesC.pct_change().dropna().std():.5f}')
+    print(f'IBOV)\tMédia dos retornos: {seriesIBOV.pct_change().dropna().mean():.5f}\n\tDesvio padrão: {seriesIBOV.pct_change().dropna().std():.5f}')
 
 prices = pd.read_csv(parentDirectory + '/Dados/IBOV.csv', parse_dates=['Date'], index_col='Date')
 
-pricesInSample, returnsInSample, meanRetInSample, sumEInSample = pricesReturnsMean(prices, '2019')
-pricesOutOfSample, returnsOutOfSample, meanRetOutOfSample, sumEOutOfSample = pricesReturnsMean(prices, '2020')
+pricesInSample, returnsInSample, meanRetInSample, sumEInSample, pricesIBOVInSample = pricesReturnsMean(prices, '2019')
+pricesOutOfSample, returnsOutOfSample, meanRetOutOfSample, sumEOutOfSample, pricesIBOVOutOfSample = pricesReturnsMean(prices, '2020')
 
 letterA(meanRetInSample, sumEInSample)
 letterB(meanRetInSample, sumEInSample)
 letterC(meanRetInSample, sumEInSample)
-letterD(pricesOutOfSample, returnsOutOfSample, meanRetInSample, sumEInSample)
-letterE(meanRetOutOfSample, sumEOutOfSample)
+seriesIBOV, seriesAOutOfSample, seriesBOutOfSample, seriesCOutOfSample = letterD(pricesOutOfSample, pricesIBOVOutOfSample, meanRetInSample, sumEInSample)
+letterE(seriesIBOV, seriesAOutOfSample, seriesBOutOfSample, seriesCOutOfSample)
